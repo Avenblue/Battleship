@@ -262,46 +262,164 @@ class Program
         }
     }
 
-    static bool TakeTurn(char[,] OpponentBoard, char[,] HiddenOpponentBoard, string playerName)
+    static bool TakeTurn(
+        char[,] OpponentBoard,
+        char[,] HiddenOpponentBoard,
+        string playerName,
+        ref (int, int)? HitCoordinate,
+        ref int DirectionofShots,
+        ref (int, int)? FirstHitCoordinate
+    )
     {
-        Console.WriteLine("It's " + playerName + "'s turn!");
-        Thread.Sleep(300);
         bool missed = false;
         int x,
             y;
-        do
+
+        if (HitCoordinate == null)
         {
-            (x, y) = RandomCoordinate();
-        } while (HiddenOpponentBoard[x, y] == '*' || HiddenOpponentBoard[x, y] == 'X');
+            do
+            {
+                (x, y) = RandomCoordinate();
+            } while (HiddenOpponentBoard[x, y] == '*' || HiddenOpponentBoard[x, y] == 'X');
 
-        Console.WriteLine($"Attacking {(char)('A' + x)}{y + 1}");
-        Thread.Sleep(300);
+            Console.WriteLine("It's " + playerName + "'s turn!");
+            Thread.Sleep(500);
+            Console.WriteLine($"Attacking {(char)('A' + x)}{y + 1}");
+            Thread.Sleep(500);
 
-        if (OpponentBoard[x, y] == 'O')
-        {
-            Console.WriteLine("It's a HIT!");
-            Console.WriteLine();
-            HiddenOpponentBoard[x, y] = 'X';
+            if (OpponentBoard[x, y] == 'O')
+            {
+                Console.WriteLine("It's a HIT!");
+                HiddenOpponentBoard[x, y] = 'X';
+                FirstHitCoordinate = (x, y);
+                HitCoordinate = (x, y);
 
-            // Check if a ship is sunk
-            CheckSunkShip(OpponentBoard, HiddenOpponentBoard, x, y);
-
-            Thread.Sleep(300);
-            Console.Clear();
+                // Check if a ship is sunk
+                if (CheckSunkShip(OpponentBoard, HiddenOpponentBoard, x, y))
+                {
+                    FirstHitCoordinate = null;
+                    HitCoordinate = null; // Reset the hit coordinate
+                    DirectionofShots = -1;
+                }
+            }
+            else
+            {
+                Console.WriteLine("It's a MISS!");
+                HiddenOpponentBoard[x, y] = '*';
+                missed = true;
+            }
         }
         else
         {
-            Console.WriteLine("It's a MISS!");
-            Console.WriteLine();
-            HiddenOpponentBoard[x, y] = '*';
-            missed = true;
-            Thread.Sleep(300);
-            Console.Clear();
+            (x, y) = HitCoordinate.Value;
+            int newX = x,
+                newY = y;
+            bool canFit = false;
+
+            // Attempt to shoot in the current direction
+            switch (DirectionofShots)
+            {
+                case 0: // Left
+                    if (
+                        x - 1 >= 0
+                        && HiddenOpponentBoard[x - 1, y] != '*'
+                        && HiddenOpponentBoard[x - 1, y] != 'X'
+                    )
+                    {
+                        newX = x - 1;
+                        canFit = true;
+                    }
+                    break;
+
+                case 1: // Up
+                    if (
+                        y - 1 >= 0
+                        && HiddenOpponentBoard[x, y - 1] != '*'
+                        && HiddenOpponentBoard[x, y - 1] != 'X'
+                    )
+                    {
+                        newY = y - 1;
+                        canFit = true;
+                    }
+                    break;
+
+                case 2: // Right
+                    if (
+                        x + 1 <= 9
+                        && HiddenOpponentBoard[x + 1, y] != '*'
+                        && HiddenOpponentBoard[x + 1, y] != 'X'
+                    )
+                    {
+                        newX = x + 1;
+                        canFit = true;
+                    }
+                    break;
+
+                case 3: // Down
+                    if (
+                        y + 1 <= 9
+                        && HiddenOpponentBoard[x, y + 1] != '*'
+                        && HiddenOpponentBoard[x, y + 1] != 'X'
+                    )
+                    {
+                        newY = y + 1;
+                        canFit = true;
+                    }
+                    break;
+            }
+
+            if (canFit)
+            {
+                x = newX;
+                y = newY;
+
+                Console.WriteLine("It's " + playerName + "'s turn!");
+                Thread.Sleep(500);
+                Console.WriteLine($"Attacking {(char)('A' + x)}{y + 1}");
+                Thread.Sleep(500);
+
+                if (OpponentBoard[x, y] == 'O')
+                {
+                    Console.WriteLine("It's a HIT!");
+                    HiddenOpponentBoard[x, y] = 'X';
+                    HitCoordinate = (x, y);
+
+                    // Check if a ship is sunk
+                    if (CheckSunkShip(OpponentBoard, HiddenOpponentBoard, x, y))
+                    {
+                        FirstHitCoordinate = null;
+                        HitCoordinate = null; // Reset the hit coordinate
+                        DirectionofShots = -1;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("It's a MISS!");
+                    HiddenOpponentBoard[x, y] = '*';
+                    missed = true;
+                }
+            }
+            else
+            {
+                // Change direction
+                DirectionofShots = (DirectionofShots + 2) % 4;
+                if (HitCoordinate != FirstHitCoordinate)
+                {
+                    HitCoordinate = FirstHitCoordinate;
+                }
+                else
+                    DirectionofShots = (DirectionofShots + 1) % 4;
+            }
         }
+
+        Thread.Sleep(500);
+        ; // Delay for one second to allow the player to see the result
+        Console.Clear(); // Clear the console after each turn
+
         return missed;
     }
 
-    static void CheckSunkShip(char[,] OpponentBoard, char[,] HiddenOpponentBoard, int x, int y)
+    static bool CheckSunkShip(char[,] OpponentBoard, char[,] HiddenOpponentBoard, int x, int y)
     {
         char shipSymbol = OpponentBoard[x, y];
         List<(int, int)> shipCoordinates = new List<(int, int)>(); // Store ship coordinates
@@ -382,6 +500,7 @@ class Program
                 }
             }
         }
+        return shipSunk;
     }
 
     static void ClearCushion(char[,] board)
@@ -398,7 +517,6 @@ class Program
         }
     }
 
-
     static void Main()
     {
         Random random = new Random();
@@ -406,6 +524,12 @@ class Program
         char[,] Player2 = CreateBoard();
         char[,] Player1Hidden = CreateBoard();
         char[,] Player2Hidden = CreateBoard();
+        (int, int)? player1FirstHitCoordinate = null;
+        (int, int)? player2FirstHitCoordinate = null;
+        (int, int)? player1HitCoordinate = null;
+        (int, int)? player2HitCoordinate = null;
+        int DirectionofShots1 = -1;
+        int DirectionofShots2 = -1;
 
         Console.WriteLine("Welcome to the Battleship Simulator");
         Console.WriteLine("Press any key to simulate the boards");
@@ -436,7 +560,7 @@ class Program
         PrintBoard(Player2Hidden, "Player 1");
 
         Console.WriteLine("Determining the first player's turn...");
-        Thread.Sleep(300); // Sleep for 1 second
+        Thread.Sleep(500);
 
         int currentTurn = random.Next(2);
         bool switchTurn = false; // Indicates whether to switch the turn
@@ -445,13 +569,27 @@ class Program
         {
             if (currentTurn == 0)
             {
-                switchTurn = TakeTurn(Player2, Player2Hidden, "Player 1");
+                switchTurn = TakeTurn(
+                    Player2,
+                    Player2Hidden,
+                    "Player 1",
+                    ref player1HitCoordinate,
+                    ref DirectionofShots1,
+                    ref player1FirstHitCoordinate
+                );
                 PrintBoard(Player1Hidden, "Player 1");
                 PrintBoard(Player2Hidden, "Player 2");
             }
             else
             {
-                switchTurn = TakeTurn(Player1, Player1Hidden, "Player 2");
+                switchTurn = TakeTurn(
+                    Player1,
+                    Player1Hidden,
+                    "Player 2",
+                    ref player2HitCoordinate,
+                    ref DirectionofShots2,
+                    ref player2FirstHitCoordinate
+                );
                 PrintBoard(Player1Hidden, "Player 1");
                 PrintBoard(Player2Hidden, "Player 2");
             }
@@ -472,11 +610,10 @@ class Program
             if (switchTurn)
                 currentTurn = 1 - currentTurn;
 
-            Thread.Sleep(300); // Sleep for 1 second
+            Thread.Sleep(500); // Sleep for 1 second
         }
 
         Console.WriteLine("Press Enter to exit...");
         Console.ReadLine();
     }
 }
-
